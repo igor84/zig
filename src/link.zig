@@ -636,6 +636,43 @@ pub const File = struct {
         }
     }
 
+    /// This function is called by the frontend before flush(). It communicates that
+    /// `options.bin_file.emit` directory needs to be renamed from
+    /// `[zig-cache]/tmp/[random]` to `[zig-cache]/o/[digest]`.
+    /// The frontend would like to simply perform a file system rename, however,
+    /// some linker backends care about the file paths of the objects they are linking.
+    /// So this function call tells linker backends to rename the paths of object files
+    /// to observe the new directory path.
+    /// Linker backends which do not have this requirement can fall back to the simple
+    /// implementation at the bottom of this function.
+    /// This function is only called when CacheMode is `whole`.
+    pub fn renameTmpIntoCache(
+        base: *File,
+        cache_directory: Compilation.Directory,
+        tmp_dir_sub_path: []const u8,
+        o_sub_path: []const u8,
+    ) !void {
+        switch (base.tag) {
+            // Linker backends that need to be notified of the change so they can do
+            // some fixups:
+            .macho => return @fieldParentPtr(MachO, "base", base).renameTmpIntoCache(
+                cache_directory,
+                tmp_dir_sub_path,
+                o_sub_path,
+            ),
+
+            // Linker backends for which a simple fs rename is fine:
+            .coff, .elf, .plan9, .c, .wasm, .spirv => {
+                try std.fs.rename(
+                    cache_directory.handle,
+                    tmp_dir_sub_path,
+                    cache_directory.handle,
+                    o_sub_path,
+                );
+            },
+        }
+    }
+
     pub fn linkAsArchive(base: *File, comp: *Compilation) !void {
         const tracy = trace(@src());
         defer tracy.end();
@@ -645,9 +682,11 @@ pub const File = struct {
         const arena = arena_allocator.allocator();
 
         const directory = base.options.emit.?.directory; // Just an alias to make it shorter to type.
+        const full_out_path = try directory.join(arena, &[_][]const u8{base.options.emit.?.sub_path});
+        const full_out_path_z = try arena.dupeZ(u8, full_out_path);
 
-        // If there is no Zig code to compile, then we should skip flushing the output file because it
-        // will not be part of the linker line anyway.
+        // If there is no Zig code to compile, then we should skip flushing the output file
+        // because it will not be part of the linker line anyway.
         const module_obj_path: ?[]const u8 = if (base.options.module) |module| blk: {
             const use_stage1 = build_options.is_stage1 and base.options.use_stage1;
             if (use_stage1) {
@@ -656,19 +695,27 @@ pub const File = struct {
                     .target = base.options.target,
                     .output_mode = .Obj,
                 });
-                const o_directory = module.zig_cache_artifact_directory;
-                const full_obj_path = try o_directory.join(arena, &[_][]const u8{obj_basename});
-                break :blk full_obj_path;
+                switch (base.options.cache_mode) {
+                    .incremental => break :blk try module.zig_cache_artifact_directory.join(
+                        arena,
+                        &[_][]const u8{obj_basename},
+                    ),
+                    .whole => break :blk try fs.path.join(arena, &.{
+                        fs.path.dirname(full_out_path_z).?, obj_basename,
+                    }),
+                }
             }
             if (base.options.object_format == .macho) {
                 try base.cast(MachO).?.flushObject(comp);
             } else {
                 try base.flushModule(comp);
             }
-            const obj_basename = base.intermediary_basename.?;
-            const full_obj_path = try directory.join(arena, &[_][]const u8{obj_basename});
-            break :blk full_obj_path;
+            break :blk try fs.path.join(arena, &.{
+                fs.path.dirname(full_out_path_z).?, base.intermediary_basename.?,
+            });
         } else null;
+
+        log.debug("module_obj_path={s}", .{if (module_obj_path) |s| s else "(null)"});
 
         const compiler_rt_path: ?[]const u8 = if (base.options.include_compiler_rt)
             comp.compiler_rt_obj.?.full_object_path
@@ -741,9 +788,6 @@ pub const File = struct {
         if (compiler_rt_path) |p| {
             object_files.appendAssumeCapacity(try arena.dupeZ(u8, p));
         }
-
-        const full_out_path = try directory.join(arena, &[_][]const u8{base.options.emit.?.sub_path});
-        const full_out_path_z = try arena.dupeZ(u8, full_out_path);
 
         if (base.options.verbose_link) {
             std.debug.print("ar rcs {s}", .{full_out_path_z});

@@ -423,6 +423,7 @@ pub fn flushModule(self: *MachO, comp: *Compilation) !void {
     const arena = arena_allocator.allocator();
 
     const directory = self.base.options.emit.?.directory; // Just an alias to make it shorter to type.
+    const full_out_path = try directory.join(arena, &[_][]const u8{self.base.options.emit.?.sub_path});
 
     // If there is no Zig code to compile, then we should skip flushing the output file because it
     // will not be part of the linker line anyway.
@@ -433,15 +434,24 @@ pub fn flushModule(self: *MachO, comp: *Compilation) !void {
                 .target = self.base.options.target,
                 .output_mode = .Obj,
             });
-            const o_directory = module.zig_cache_artifact_directory;
-            const full_obj_path = try o_directory.join(arena, &[_][]const u8{obj_basename});
-            break :blk full_obj_path;
+            switch (self.base.options.cache_mode) {
+                .incremental => break :blk try module.zig_cache_artifact_directory.join(
+                    arena,
+                    &[_][]const u8{obj_basename},
+                ),
+                .whole => break :blk try fs.path.join(arena, &.{
+                    fs.path.dirname(full_out_path).?, obj_basename,
+                }),
+            }
         }
 
         const obj_basename = self.base.intermediary_basename orelse break :blk null;
+
         try self.flushObject(comp);
-        const full_obj_path = try directory.join(arena, &[_][]const u8{obj_basename});
-        break :blk full_obj_path;
+
+        break :blk try fs.path.join(arena, &.{
+            fs.path.dirname(full_out_path).?, obj_basename,
+        });
     } else null;
 
     const is_lib = self.base.options.output_mode == .Lib;
@@ -534,7 +544,6 @@ pub fn flushModule(self: *MachO, comp: *Compilation) !void {
             else => |e| return e,
         };
     }
-    const full_out_path = try directory.join(arena, &[_][]const u8{self.base.options.emit.?.sub_path});
 
     if (self.base.options.output_mode == .Obj) {
         // LLD's MachO driver does not support the equivalent of `-r` so we do a simple file copy
@@ -1269,7 +1278,7 @@ fn parseInputFiles(self: *MachO, files: []const []const u8, syslibroot: ?[]const
     for (files) |file_name| {
         const full_path = full_path: {
             var buffer: [fs.MAX_PATH_BYTES]u8 = undefined;
-            const path = try std.fs.realpath(file_name, &buffer);
+            const path = try fs.realpath(file_name, &buffer);
             break :full_path try self.base.allocator.dupe(u8, path);
         };
         defer self.base.allocator.free(full_path);
@@ -3628,6 +3637,28 @@ pub fn updateDecl(self: *MachO, module: *Module, decl: *Module.Decl) !void {
     // needs to be updated.
     const decl_exports = module.decl_exports.get(decl) orelse &[0]*Module.Export{};
     try self.updateDeclExports(module, decl, decl_exports);
+}
+
+pub fn renameTmpIntoCache(
+    self: *MachO,
+    cache_directory: Compilation.Directory,
+    tmp_dir_sub_path: []const u8,
+    o_sub_path: []const u8,
+) !void {
+    _ = self;
+
+    // TODO: something more sophisticated than this is needed because we end
+    // up with a binary with debug info that has object file paths pointing to
+    // the tmp directory which causes problems when printing stack traces.
+    // We need to update the binary here to make the object file paths point
+    // to o_sub_path instead of tmp_dir_sub_path.
+
+    try fs.rename(
+        cache_directory.handle,
+        tmp_dir_sub_path,
+        cache_directory.handle,
+        o_sub_path,
+    );
 }
 
 fn placeDecl(self: *MachO, decl: *Module.Decl, code_len: usize) !*macho.nlist_64 {
