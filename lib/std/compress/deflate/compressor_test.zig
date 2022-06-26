@@ -188,10 +188,10 @@ test "very long sparse chunk" {
         const Self = @This();
         const Error = error{};
 
-        pub const Reader = io.Reader(*Self, Error, read);
+        pub const Reader = io.Reader(Error);
 
         pub fn reader(self: *Self) Reader {
-            return .{ .context = self };
+            return Reader.init(Self, self, read);
         }
 
         fn read(s: *Self, b: []u8) Error!usize {

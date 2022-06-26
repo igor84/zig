@@ -23,15 +23,15 @@ pub const FileProtocol = extern struct {
     pub const ReadError = error{ReadError};
     pub const WriteError = error{WriteError};
 
-    pub const Reader = io.SeekableReader(*const FileProtocol, ReadError, readFn);
-    pub const Writer = io.SeekableWriter(*const FileProtocol, WriteError, writeFn);
+    pub const Reader = io.SeekableReader(ReadError);
+    pub const Writer = io.SeekableWriter(WriteError);
 
     pub fn reader(self: *FileProtocol) Reader {
-        return .{ .context = self };
+        return Reader.init(FileProtocol, self, readFn, seekTo, seekBy, getEndPos, getPos);
     }
 
     pub fn writer(self: *FileProtocol) Writer {
-        return .{ .context = self };
+        return Reader.init(FileProtocol, self, writeFn, seekTo, seekBy, getEndPos, getPos);
     }
 
     pub fn open(self: *const FileProtocol, new_handle: **const FileProtocol, file_name: [*:0]const u16, open_mode: u64, attributes: u64) Status {

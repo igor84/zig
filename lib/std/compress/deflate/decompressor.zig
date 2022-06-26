@@ -297,21 +297,21 @@ pub fn decompressor(allocator: Allocator, reader: anytype, dictionary: ?[]const 
     return Decompressor(@TypeOf(reader)).init(allocator, reader, dictionary);
 }
 
-pub fn Decompressor(comptime ReaderType: type) type {
+pub fn Decompressor(comptime ReaderError: type) type {
     return struct {
         const Self = @This();
 
         pub const Error =
-            ReaderType.Error ||
+            ReaderError ||
             error{EndOfStream} ||
             InflateError ||
             Allocator.Error;
-        pub const Reader = io.Reader(*Self, Error, read);
+        pub const Reader = io.Reader(Error);
 
         allocator: Allocator,
 
         // Input source.
-        inner_reader: ReaderType,
+        inner_reader: io.Reader(ReaderError),
         roffset: u64,
 
         // Input bits, in top of b.
@@ -355,7 +355,7 @@ pub fn Decompressor(comptime ReaderType: type) type {
             return .{ .context = self };
         }
 
-        fn init(allocator: Allocator, in_reader: ReaderType, dict: ?[]const u8) !Self {
+        fn init(allocator: Allocator, in_reader: io.Reader(ReaderError), dict: ?[]const u8) !Self {
             fixed_huffman_decoder = try fixedHuffmanDecoderInit(allocator);
 
             var bits = try allocator.create([max_num_lit + max_num_dist]u32);
@@ -890,7 +890,7 @@ pub fn Decompressor(comptime ReaderType: type) type {
 
         /// Replaces the inner reader and dictionary with new_reader and new_dict.
         /// new_reader must be of the same type as the reader being replaced.
-        pub fn reset(s: *Self, new_reader: ReaderType, new_dict: ?[]const u8) !void {
+        pub fn reset(s: *Self, new_reader: io.Reader(ReaderError), new_dict: ?[]const u8) !void {
             s.inner_reader = new_reader;
             s.step = nextBlock;
             s.err = null;

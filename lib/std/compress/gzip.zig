@@ -15,18 +15,18 @@ const FEXTRA = 1 << 2;
 const FNAME = 1 << 3;
 const FCOMMENT = 1 << 4;
 
-pub fn GzipStream(comptime ReaderType: type) type {
+pub fn GzipStream(comptime ReaderError: type) type {
     return struct {
         const Self = @This();
 
-        pub const Error = ReaderType.Error ||
-            deflate.Decompressor(ReaderType).Error ||
+        pub const Error = ReaderError ||
+            deflate.Decompressor(ReaderError).Error ||
             error{ CorruptedData, WrongChecksum };
-        pub const Reader = io.Reader(*Self, Error, read);
+        pub const Reader = io.Reader(Error);
 
         allocator: mem.Allocator,
-        inflater: deflate.Decompressor(ReaderType),
-        in_reader: ReaderType,
+        inflater: deflate.Decompressor(ReaderError),
+        in_reader: io.Reader(ReaderError),
         hasher: std.hash.Crc32,
         read_amt: usize,
 
@@ -36,7 +36,7 @@ pub fn GzipStream(comptime ReaderType: type) type {
             modification_time: u32,
         },
 
-        fn init(allocator: mem.Allocator, source: ReaderType) !Self {
+        fn init(allocator: mem.Allocator, source: io.Reader(ReaderError)) !Self {
             // gzip header format is specified in RFC1952
             const header = try source.readBytesNoEof(10);
 
@@ -141,7 +141,7 @@ pub fn GzipStream(comptime ReaderType: type) type {
         }
 
         pub fn reader(self: *Self) Reader {
-            return .{ .context = self };
+            return Reader.init(Self, self, read);
         }
     };
 }

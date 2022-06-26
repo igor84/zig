@@ -116,12 +116,13 @@ pub const Client = struct {
     }
 
     /// Wrap `tcp.Client` into `std.io.Reader`.
-    pub fn reader(self: Client, flags: u32) io.Reader(Client.Reader, ErrorSetOf(Client.Reader.read), Client.Reader.read) {
+    pub fn reader(self: Client, flags: u32) io.Reader(ErrorSetOf(Client.Reader.read)) {
         return .{ .context = .{ .client = self, .flags = flags } };
     }
 
     /// Wrap `tcp.Client` into `std.io.Writer`.
     pub fn writer(self: Client, flags: u32) io.Writer(Client.Writer, ErrorSetOf(Client.Writer.write), Client.Writer.write) {
+        // TODO(igors): how to make this work with vTable?
         return .{ .context = .{ .client = self, .flags = flags } };
     }
 

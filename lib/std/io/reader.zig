@@ -5,66 +5,122 @@ const mem = std.mem;
 const testing = std.testing;
 const SeekMethods = std.io.SeekMethods;
 
-pub fn Reader(
-    comptime Context: type,
-    comptime ReadError: type,
-    /// Returns the number of bytes read. It may be less than buffer.len.
-    /// If the number of bytes read is 0, it means end of stream.
-    /// End of stream is not an error condition.
-    comptime readFn: fn (context: Context, buffer: []u8) ReadError!usize,
-) type {
+pub fn Reader(comptime ReadError: type) type {
     return struct {
-        context: Context,
+        context: *anyopaque,
+        vtable: *const VTable,
 
+        pub const Error = ReadError;
         const Self = @This();
+
+        const VTable = struct {
+            readFn: fn (*anyopaque, []u8) Error!usize,
+        };
+
+        pub fn init(comptime T: type, ctx: *T, comptime readFn: fn(*T, []u8) Error!usize) Self {
+            const gen = struct {
+                fn readImpl(ptr: *anyopaque, buffer: []u8) Error!usize {
+                    return readFn(@ptrCast(*T, @alignCast(@alignOf(T), ptr)), buffer);
+                }
+
+                const vtable = VTable { .readFn = readImpl };
+            };
+
+            return . { .context = ctx, .vtable = &gen.vtable };
+        }
 
         pub usingnamespace ReaderMethods(Self, Context, ReadError, readFn);
     };
 }
 
 pub fn SeekableReader(
-    comptime Context: type,
     comptime ReadError: type,
-    /// Returns the number of bytes read. It may be less than buffer.len.
-    /// If the number of bytes read is 0, it means end of stream.
-    /// End of stream is not an error condition.
-    comptime readFn: fn (context: Context, buffer: []u8) ReadError!usize,
+    comptime SeekErrorType: type,
+    comptime GetSeekPosErrorType: type,
 ) type {
     return struct {
-        context: Context,
+        context: *anyopaque,
+        vtable: *const VTable,
 
+        pub const Error = ReadError;
+        pub const SeekError = SeekErrorType;
+        pub const GetSeekPosError = GetSeekPosErrorType;
         const Self = @This();
 
-        pub usingnamespace ReaderMethods(Self, Context, ReadError, readFn);
+        const VTable = struct {
+            readFn: fn (*anyopaque, []u8) Error!usize,
+            seekToFn: fn (*anyopaque, pos: u64) SeekError!void,
+            seekByFn: fn (*anyopaque, amt: i64) SeekError!void,
+            getEndPosFn: fn (*anyopaque) GetSeekPosError!u64,
+            getPosFn: fn (*anyopaque) GetSeekPosError!u64,
+        };
 
-        pub usingnamespace SeekMethods(Self, Context);
+        pub fn init(
+            comptime T: type,
+            ctx: *T,
+            comptime readFn: fn(*T, []u8) Error!usize,
+            comptime seekToFn: fn(*T, pos: u64) SeekError!void,
+            comptime seekByFn: fn(*T, amt: i64) SeekError!void,
+            comptime getEndPosFn: fn(*T)  GetSeekPosError!u64,
+            comptime getPosFn: fn(*T)  GetSeekPosError!u64,
+        ) Self {
+            const gen = struct {
+                fn readImpl(ptr: *anyopaque, buffer: []u8) Error!usize {
+                    return readFn(@ptrCast(*T, @alignCast(@alignOf(T), ptr)), buffer);
+                }
+
+                fn seekToImpl(ptr: *anyopaque, pos: u64) SeekError!void {
+                    return seekToFn(@ptrCast(*T, @alignCast(@alignOf(T), ptr)), pos);
+                }
+
+                fn seekByImpl(ptr: *anyopaque, amt: i64) SeekError!void {
+                    return seekByFn(@ptrCast(*T, @alignCast(@alignOf(T), ptr)), amt);
+                }
+
+                fn getEndPosImpl(ptr: *anyopaque) GetSeekPosError!u64 {
+                    return getEndPosFn(@ptrCast(*T, @alignCast(@alignOf(T), ptr)));
+                }
+
+                fn getPosImpl(ptr: *anyopaque) GetSeekPosError!u64 {
+                    return getPosFn(@ptrCast(*T, @alignCast(@alignOf(T), ptr)));
+                }
+
+                const vtable = VTable{
+                    .readFn = readImpl,
+                    .seekToFn = seekToImpl,
+                    .seekByFn = seekByImpl,
+                    .getEndPosFn = getEndPosImpl,
+                    .getPosFn = getPosImpl,
+                };
+            };
+
+            return .{
+                .context = ctx,
+                .vtable = &gen.vtable,
+            };
+        }
+
+        pub usingnamespace ReaderMethods(Self);
+
+        pub usingnamespace SeekMethods(Self);
     };
 }
 
-pub fn ReaderMethods(
-    comptime Self: type,
-    comptime Context: type,
-    comptime ReadError: type,
-    /// Returns the number of bytes read. It may be less than buffer.len.
-    /// If the number of bytes read is 0, it means end of stream.
-    /// End of stream is not an error condition.
-    comptime readFn: fn (context: Context, buffer: []u8) ReadError!usize,
-) type {
+pub fn ReaderMethods(comptime Self: type) type {
     return struct {
-        pub const reader_interface_id = @typeName(Context) ++ ".Reader";
-        pub const Error = ReadError;
+        pub const reader_interface_id = @typeName(Self.Error) ++ ".Reader";
 
         /// Returns the number of bytes read. It may be less than buffer.len.
         /// If the number of bytes read is 0, it means end of stream.
         /// End of stream is not an error condition.
-        pub fn read(self: Self, buffer: []u8) Error!usize {
-            return readFn(self.context, buffer);
+        pub fn read(self: Self, buffer: []u8) Self.Error!usize {
+            return self.vtable.readFn(self.context, buffer);
         }
 
         /// Returns the number of bytes read. If the number read is smaller than `buffer.len`, it
         /// means the stream reached the end. Reaching the end of a stream is not an error
         /// condition.
-        pub fn readAll(self: Self, buffer: []u8) Error!usize {
+        pub fn readAll(self: Self, buffer: []u8)Self.Error!usize {
             var index: usize = 0;
             while (index != buffer.len) {
                 const amt = try self.read(buffer[index..]);

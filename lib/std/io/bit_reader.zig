@@ -7,21 +7,21 @@ const meta = std.meta;
 const math = std.math;
 
 /// Creates a stream which allows for reading bit fields from another stream
-pub fn BitReader(endian: std.builtin.Endian, comptime ReaderType: type) type {
+pub fn BitReader(endian: std.builtin.Endian, comptime ReaderError: type) type {
     return struct {
-        forward_reader: ReaderType,
+        forward_reader: io.Reader(ReaderError),
         bit_buffer: u7,
         bit_count: u3,
 
-        pub const Error = ReaderType.Error;
-        pub const Reader = io.Reader(*Self, Error, read);
+        pub const Error = ReaderError;
+        pub const Reader = io.Reader(Error);
 
         const Self = @This();
         const u8_bit_count = @bitSizeOf(u8);
         const u7_bit_count = @bitSizeOf(u7);
         const u4_bit_count = @bitSizeOf(u4);
 
-        pub fn init(forward_reader: ReaderType) Self {
+        pub fn init(forward_reader: io.Reader(ReaderError)) Self {
             return Self{
                 .forward_reader = forward_reader,
                 .bit_buffer = 0,

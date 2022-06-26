@@ -39,8 +39,8 @@ pub fn LinearFifo(
         count: usize,
 
         const Self = @This();
-        pub const Reader = std.io.Reader(*Self, error{}, readFn);
-        pub const Writer = std.io.Writer(*Self, error{OutOfMemory}, appendWrite);
+        pub const Reader = std.io.Reader(error{});
+        pub const Writer = std.io.Writer(error{OutOfMemory});
 
         // Type of Self argument for slice operations.
         // If buffer is inline (Static) then we need to ensure we haven't
@@ -228,7 +228,7 @@ pub fn LinearFifo(
         }
 
         pub fn reader(self: *Self) Reader {
-            return .{ .context = self };
+            return Reader.init(Self, self, readFn);
         }
 
         /// Returns number of items available in fifo
@@ -318,7 +318,7 @@ pub fn LinearFifo(
         }
 
         pub fn writer(self: *Self) Writer {
-            return .{ .context = self };
+            return Writer.init(Self, self, appendWrite);
         }
 
         /// Make `count` items available before the current read location

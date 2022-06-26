@@ -9,7 +9,7 @@ pub fn CountingReader(comptime ReaderType: anytype) type {
         bytes_read: u64 = 0,
 
         pub const Error = ReaderType.Error;
-        pub const Reader = io.Reader(*@This(), Error, read);
+        pub const Reader = io.Reader(Error);
 
         pub fn read(self: *@This(), buf: []u8) Error!usize {
             const amt = try self.child_reader.read(buf);
@@ -18,12 +18,12 @@ pub fn CountingReader(comptime ReaderType: anytype) type {
         }
 
         pub fn reader(self: *@This()) Reader {
-            return .{ .context = self };
+            return Reader.init(@This(), self, read);
         }
     };
 }
 
-pub fn countingReader(reader: anytype) CountingReader(@TypeOf(reader)) {
+pub fn countingReader(comptime ReadError: type, reader: io.Reader(ReadError)) CountingReader(@TypeOf(reader)) {
     return .{ .child_reader = reader };
 }
 

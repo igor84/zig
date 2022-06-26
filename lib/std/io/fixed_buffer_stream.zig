@@ -17,17 +17,17 @@ pub fn FixedBufferStream(comptime Buffer: type) type {
         pub const SeekError = error{};
         pub const GetSeekPosError = error{};
 
-        pub const Reader = io.SeekableReader(*Self, ReadError, read);
-        pub const Writer = io.SeekableWriter(*Self, WriteError, write);
+        pub const Reader = io.SeekableReader(ReadError);
+        pub const Writer = io.SeekableWriter(WriteError);
 
         const Self = @This();
 
         pub fn reader(self: *Self) Reader {
-            return .{ .context = self };
+            return Reader.init(Self, self, read, seekTo, seekBy, getEndPos, getPos);
         }
 
         pub fn writer(self: *Self) Writer {
-            return .{ .context = self };
+            return Writer.init(Self, self, write, seekTo, seekBy, getEndPos, getPos);
         }
 
         pub fn read(self: *Self, dest: []u8) ReadError!usize {

@@ -1636,15 +1636,15 @@ pub const Stream = struct {
     pub const ReadError = os.ReadError;
     pub const WriteError = os.WriteError;
 
-    pub const Reader = io.Reader(Stream, ReadError, read);
-    pub const Writer = io.Writer(Stream, WriteError, write);
+    pub const Reader = io.Reader(ReadError);
+    pub const Writer = io.Writer(WriteError);
 
-    pub fn reader(self: Stream) Reader {
-        return .{ .context = self };
+    pub fn reader(self: *Stream) Reader {
+        return Reader.init(Stream, self, read);
     }
 
-    pub fn writer(self: Stream) Writer {
-        return .{ .context = self };
+    pub fn writer(self: *Stream) Writer {
+        return Writer.init(Stram, self, write);
     }
 
     pub fn read(self: Stream, buffer: []u8) ReadError!usize {

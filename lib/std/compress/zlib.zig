@@ -8,21 +8,21 @@ const testing = std.testing;
 const mem = std.mem;
 const deflate = std.compress.deflate;
 
-pub fn ZlibStream(comptime ReaderType: type) type {
+pub fn ZlibStream(comptime ReaderError: type) type {
     return struct {
         const Self = @This();
 
-        pub const Error = ReaderType.Error ||
-            deflate.Decompressor(ReaderType).Error ||
+        pub const Error = ReaderError ||
+            deflate.Decompressor(ReaderError).Error ||
             error{ WrongChecksum, Unsupported };
-        pub const Reader = io.Reader(*Self, Error, read);
+        pub const Reader = io.Reader(Error);
 
         allocator: mem.Allocator,
-        inflater: deflate.Decompressor(ReaderType),
-        in_reader: ReaderType,
+        inflater: deflate.Decompressor(ReaderError),
+        in_reader: io.Reader(ReaderError),
         hasher: std.hash.Adler32,
 
-        fn init(allocator: mem.Allocator, source: ReaderType) !Self {
+        fn init(allocator: mem.Allocator, source: io.Reader(ReaderError)) !Self {
             // Zlib header format is specified in RFC1950
             const header = try source.readBytesNoEof(2);
 
@@ -79,7 +79,7 @@ pub fn ZlibStream(comptime ReaderType: type) type {
         }
 
         pub fn reader(self: *Self) Reader {
-            return .{ .context = self };
+            return Reader.init(Self, self, read);
         }
     };
 }

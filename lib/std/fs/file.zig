@@ -1359,16 +1359,16 @@ pub const File = struct {
         }
     }
 
-    pub const Reader = io.SeekableReader(File, ReadError, read);
+    pub const Reader = io.SeekableReader(ReadError);
 
-    pub fn reader(file: File) Reader {
-        return .{ .context = file };
+    pub fn reader(file: *File) Reader {
+        return Reader.init(File, file, read, seekTo, seekBy, getEndPos, getPos);
     }
 
-    pub const Writer = io.SeekableWriter(File, WriteError, write);
+    pub const Writer = io.SeekableWriter(WriteError);
 
-    pub fn writer(file: File) Writer {
-        return .{ .context = file };
+    pub fn writer(file: *File) Writer {
+        return Writer.init(File, file, write, seekTo, seekBy, getEndPos, getPos);
     }
 
     const range_off: windows.LARGE_INTEGER = 0;
