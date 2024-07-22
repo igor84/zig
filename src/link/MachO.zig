@@ -453,11 +453,6 @@ pub fn flushModule(self: *MachO, arena: Allocator, tid: Zcu.PerThread.Id, prog_n
         };
     }
 
-    if (comp.fuzzer_lib) |fuzzer_lib| {
-        _ = fuzzer_lib.full_object_path;
-        log.err("TODO macho linking code for adding libfuzzer", .{});
-    }
-
     // Finally, link against compiler_rt.
     const compiler_rt_path: ?[]const u8 = blk: {
         if (comp.compiler_rt_lib) |x| break :blk x.full_object_path;
@@ -731,6 +726,10 @@ fn dumpArgv(self: *MachO, comp: *Compilation) !void {
             const path = comp.tsan_lib.?.full_object_path;
             try argv.append(path);
             try argv.appendSlice(&.{ "-rpath", std.fs.path.dirname(path) orelse "." });
+        }
+
+        if (comp.config.any_fuzz) {
+            try argv.append(comp.fuzzer_lib.?.full_object_path);
         }
 
         for (self.lib_dirs) |lib_dir| {
