@@ -1028,8 +1028,6 @@ pub const Cpu = struct {
         xtensa,
         nvptx,
         nvptx64,
-        spir,
-        spir64,
         spirv,
         spirv32,
         spirv64,
@@ -1049,6 +1047,8 @@ pub const Cpu = struct {
         // - amdil64
         // - hsail
         // - hsail64
+        // - spir
+        // - spir64
         // - shave
         // - renderscript32
         // - renderscript64
@@ -1179,7 +1179,6 @@ pub const Cpu = struct {
                 .xcore => .XCORE,
                 .xtensa => .XTENSA,
                 .nvptx => .NONE,
-                .spir => .NONE,
                 .kalimba => .CSR_KALIMBA,
                 .lanai => .LANAI,
                 .wasm32 => .NONE,
@@ -1192,7 +1191,6 @@ pub const Cpu = struct {
                 .riscv64 => .RISCV,
                 .x86_64 => .X86_64,
                 .nvptx64 => .NONE,
-                .spir64 => .NONE,
                 .wasm64 => .NONE,
                 .amdgcn => .AMDGPU,
                 .bpfel => .BPF,
@@ -1232,7 +1230,6 @@ pub const Cpu = struct {
                 .xcore => .Unknown,
                 .xtensa => .Unknown,
                 .nvptx => .Unknown,
-                .spir => .Unknown,
                 .kalimba => .Unknown,
                 .lanai => .Unknown,
                 .wasm32 => .Unknown,
@@ -1245,7 +1242,6 @@ pub const Cpu = struct {
                 .riscv64 => .RISCV64,
                 .x86_64 => .X64,
                 .nvptx64 => .Unknown,
-                .spir64 => .Unknown,
                 .wasm64 => .Unknown,
                 .amdgcn => .Unknown,
                 .bpfel => .Unknown,
@@ -1290,8 +1286,6 @@ pub const Cpu = struct {
                 .wasm64,
                 .xcore,
                 .thumb,
-                .spir,
-                .spir64,
                 .ve,
                 .spu_2,
                 // GPU bitness is opaque. For now, assume little endian.
@@ -1773,8 +1767,6 @@ pub const DynamicLinker = struct {
                 .msp430,
                 .amdgcn,
                 .xcore,
-                .spir,
-                .spir64,
                 .kalimba,
                 .lanai,
                 .ve,
@@ -1871,7 +1863,6 @@ pub fn ptrBitWidth_cpu_abi(cpu: Cpu, abi: Abi) u16 {
         .x86,
         .xcore,
         .nvptx,
-        .spir,
         .kalimba,
         .lanai,
         .wasm32,
@@ -1890,7 +1881,6 @@ pub fn ptrBitWidth_cpu_abi(cpu: Cpu, abi: Abi) u16 {
         .riscv64,
         .x86_64,
         .nvptx64,
-        .spir64,
         .wasm64,
         .amdgcn,
         .bpfel,
@@ -2375,7 +2365,6 @@ pub fn c_type_alignment(target: Target, c_type: CType) u16 {
             .xcore,
             .dxil,
             .loongarch32,
-            .spir,
             .spirv32,
             .kalimba,
             .ve,
@@ -2398,7 +2387,6 @@ pub fn c_type_alignment(target: Target, c_type: CType) u16 {
             .nvptx,
             .nvptx64,
             .s390x,
-            .spir64,
             .spirv64,
             => 8,
 
@@ -2483,7 +2471,6 @@ pub fn c_type_preferred_alignment(target: Target, c_type: CType) u16 {
             .xcore,
             .dxil,
             .loongarch32,
-            .spir,
             .spirv32,
             .kalimba,
             .ve,
@@ -2513,7 +2500,6 @@ pub fn c_type_preferred_alignment(target: Target, c_type: CType) u16 {
             .nvptx,
             .nvptx64,
             .s390x,
-            .spir64,
             .spirv64,
             => 8,
 
