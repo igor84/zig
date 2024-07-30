@@ -1031,6 +1031,8 @@ pub const Cpu = struct {
         // - aarch64_32
         // - r600
         // - sparcel
+        // - tce
+        // - tcele
         // - le32
         // - le64
         // - amdil
