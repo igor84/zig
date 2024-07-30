@@ -17,7 +17,6 @@ pub const Os = struct {
 
     pub const Tag = enum {
         freestanding,
-        cloudabi,
         dragonfly,
         freebsd,
         fuchsia,
@@ -139,7 +138,6 @@ pub const Os = struct {
         pub inline fn getVersionRangeTag(tag: Tag) @typeInfo(TaggedVersionRange).Union.tag_type.? {
             return switch (tag) {
                 .freestanding,
-                .cloudabi,
                 .fuchsia,
                 .ps3,
                 .zos,
@@ -371,7 +369,6 @@ pub const Os = struct {
         pub fn default(tag: Tag, arch: Cpu.Arch) VersionRange {
             return switch (tag) {
                 .freestanding,
-                .cloudabi,
                 .fuchsia,
                 .ps3,
                 .zos,
@@ -557,7 +554,6 @@ pub const Os = struct {
             .linux,
             .windows,
             .freestanding,
-            .cloudabi,
             .fuchsia,
             .ps3,
             .zos,
@@ -663,7 +659,6 @@ pub const Abi = enum {
     pub fn default(arch: Cpu.Arch, os: Os) Abi {
         return if (arch.isWasm()) .musl else switch (os.tag) {
             .freestanding,
-            .cloudabi,
             .dragonfly,
             .ps3,
             .zos,
@@ -1794,7 +1789,6 @@ pub const DynamicLinker = struct {
 
             // TODO go over each item in this list and either move it to the above list, or
             // implement the standard dynamic linker path code for it.
-            .cloudabi,
             .fuchsia,
             .ps3,
             .zos,
@@ -2282,7 +2276,6 @@ pub fn c_type_bit_size(target: Target, c_type: CType) u16 {
             .longdouble => return 80,
         },
 
-        .cloudabi,
         .ps3,
         .zos,
         .rtems,
